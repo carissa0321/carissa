@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>给妈妈的专属回忆</title>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background-color: #FFF5EE; /* 蜜桃暖色背景 */
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            overflow: hidden;
+            color: #5C4033;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 文字提示：加了半透明糖果底座，保证看清 */
+        #hint {
+            position: absolute;
+            top: 15%;
+            width: 85%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.88);
+            border-radius: 30px;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+            color: #D2691E; /* 亮棕橘色 */
+            font-size: 1.6rem;
+            font-weight: bold;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.06); opacity: 0.9; }
+        }
+
+        /* 画布层：用于爱心爆裂动画 (已移至最顶层以确保可见) */
+        #particle-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 150; /* 确保在照片和提示文字之上爆裂 */
+        }
+
+        /* 照片连线区 */
+        #photo-banner {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            transition: opacity 1s ease;
+        }
+
+        .photo-line {
+            position: absolute;
+            background-color: #A0522D; /* 绳子颜色 */
+            height: 2px;
+            transform-origin: left center;
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .interactive-photo-container {
+            position: absolute;
+            width: 160px; /* 照片大小 */
+            transform-origin: center top;
+            transform: translate(-50%, -50px) scale(0);
+            opacity: 0;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+        .interactive-photo-container.show {
+            transform: translate(-50%, 0) scale(1) rotate(calc(var(--rot) * 1deg));
+            opacity: 1;
+        }
+
+        .clip-img { width: 35px; height: auto; margin-bottom: -8px; z-index: 15; background: transparent !important; }
+        .interactive-photo {
+            width: 100%; height: 160px;
+            object-fit: cover;
+            border: 6px solid white;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+
+        /* 信封与贺卡 */
+        #envelope-container {
+            display: none;
+            text-align: center;
+            z-index: 200;
+            animation: fadeIn 1s forwards;
+            cursor: pointer;
+        }
+        #envelope-container img { width: 160px; background: transparent !important; filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); }
+        #envelope-container p { font-size: 1.2rem; font-weight: bold; margin-top: 10px; color: #8B4513; }
+
+        #card-container {
+            display: none;
+            background: #fff;
+            width: 85%; max-width: 380px;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            z-index: 300;
+            flex-direction: column;
+            align-items: center;
+            animation: sway 5s ease-in-out infinite;
+        }
+        @keyframes sway {
+            0%, 100% { transform: rotate(-1.5deg); }
+            50% { transform: rotate(1.5deg); }
+        }
+
+        .photo-frame { width: 100%; height: 240px; margin-bottom: 15px; overflow: hidden; border-radius: 8px; }
+        .photo-frame img { width: 100%; height: 100%; object-fit: cover; }
+        #typewriter-text { line-height: 1.7; font-size: 1.15rem; min-height: 120px; color: #5C4033; font-weight: 500;}
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <audio id="bgm" src="music.mp3" loop></audio>
+    <canvas id="particle-canvas"></canvas>
+
+    <div id="hint">✨ 点击屏幕任意处<br>解锁对妈妈的爱 ✨</div>
+
+    <div id="photo-banner"></div>
+
+    <div id="envelope-container" onclick="openCard()">
+        < img src="envelope.png" alt="信封">
+        <p>有一封亲笔信 💌</p >
+    </div>
+
+    <div id="card-container">
+        <div class="photo-frame">< img src="photo.jpg"></div>
+        <div id="typewriter-text"></div>
+    </div>
+
+    <script>
+        const interactivePhotos = ['p1.jpg', 'p2.jpg', 'p3.jpg', 'p4.jpg', 'p5.jpg'];
+        const cardText = "亲爱的妈妈：\n\n母亲节快乐！\n这一生，感谢您做我的妈妈。\n\n刚才出现的那些瞬间，\n是我心中最温暖的回忆。\n愿您被时光温柔以待，\n永远健康，永远美丽。\n\n永远爱您的宝贝";
+        
+        let clickCount = 0;
+        let bgmPlayed = false;
+        const clipPositions = []; 
+
+        // --- Canvas 粒子系统逻辑 (超级增强版) ---
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Particle {
+            constructor(x, y, isHeart) {
+                this.x = x; this.y = y;
+                this.isHeart = isHeart;
+                
+                // 1. 尺寸大大增加：主爱心更清晰，粒子更多
+                this.size = isHeart ? Math.random() * 25 + 20 : Math.random() * 6 + 2; 
+                
+                // 2. 扩散速度更快，范围更广
+                this.speedX = (Math.random() - 0.5) * 15; 
+                this.speedY = (Math.random() - 0.5) * 15 - 5; // 稍微向上喷射
+                
+                // 3. 颜色更亮，增加金色粒子
+                this.color = isHeart ? `hsl(${Math.random() * 20 + 340}, 90%, 65%)` : '#FFD700'; // 金色或亮粉色
+                
+                // 4. 淡出时间延长，多停留一会
+                this.opacity = 1;
+                this.gravity = 0.15;
+            }
+            draw() {
+                ctx.save(); // 保存状态以应用发光效果
+                ctx.globalAlpha = this.opacity;
+                
+                // 5. 关键修改：增加强烈发光效果 (Glow)
+                ctx.shadowBlur = this.isHeart ? 25 : 10; 
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                
+                if (this.isHeart) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.bezierCurveTo(this.x - this.size / 2, this.y - this.size / 2, this.x - this.size, this.y + this.size / 3, this.x, this.y + this.size);
+                    ctx.bezierCurveTo(this.x + this.size, this.y + this.size / 3, this.x + this.size / 2, this.y - this.size / 2, this.x, this.y);
+                    ctx.fill();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore(); // 恢复状态，避免发光效果叠加
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.speedY += this.gravity;
+                this.opacity -= 0.01; // 6. 淡出速度减慢
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles = particles.filter(p => p.opacity > 0);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        function createBurst(x, y) {
+            // 7. 粒子数量翻倍
+            for (let i = 0; i < 80; i++) particles.push(new Particle(x, y, true)); // 噴出超级多爱心
+            for (let i = 0; i < 150; i++) particles.push(new Particle(x, y, false)); // 噴出超级多金色粒子
+        }
+
+        // --- 交互逻辑 ---
+        document.body.addEventListener('click', (e) => {
+            if (!bgmPlayed) {
+                document.getElementById('bgm').play().catch(() => {});
+                bgmPlayed = true;
+            }
+
+            if (clickCount < interactivePhotos.length) {
+                const x = e.clientX, y = e.clientY;
+                showPhotoWithClip(x, y, interactivePhotos[clickCount], clickCount);
+                clickCount++;
+
+                if (clickCount === interactivePhotos.length) {
+                    setTimeout(() => {
+                        // 8. 在屏幕正中心迸发大爱心
+                        createBurst(window.innerWidth / 2, window.innerHeight / 2); 
+                        document.getElementById('hint').style.display = 'none';
+                        setTimeout(() => {
+                            document.getElementById('envelope-container').style.display = 'block';
+                        }, 1200);
+                    }, 1200);
+                }
+            }
+        });
+
+        function showPhotoWithClip(x, y, src, index) {
+            const banner = document.getElementById('photo-banner');
+            const container = document.createElement('div');
+            container.className = 'interactive-photo-container';
+            container.style.left = x + 'px'; container.style.top = y + 'px';
+
+            const clip = document.createElement('img');
+            clip.src = 'clip.png'; clip.className = 'clip-img';
+            container.appendChild(clip);
+
+            const img = document.createElement('img');
+            img.src = src; img.className = 'interactive-photo';
+            container.appendChild(img);
+            
+            container.style.setProperty('--rot', Math.random() * 30 - 15);
+            banner.appendChild(container);
+
+            if (index > 0) drawLine(clipPositions[index - 1], {x, y: y + 15}, banner);
+            clipPositions.push({x, y: y + 15});
+            setTimeout(() => container.classList.add('show'), 50);
+        }
+
+        function drawLine(start, end, container) {
+            const line = document.createElement('div');
+            line.className = 'photo-line';
+            const len = Math.sqrt(Math.pow(end.x-start.x,2) + Math.pow(end.y-start.y,2));
+            const angle = Math.atan2(end.y-start.y, end.x-start.x) * 180 / Math.PI;
+            line.style.width = len + 'px'; line.style.left = start.x + 'px'; line.style.top = start.y + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            container.appendChild(line);
+            setTimeout(() => line.style.opacity = '0.6', 500);
+        }
+
+        function openCard() {
+            document.getElementById('envelope-container').style.display = 'none';
+            document.getElementById('photo-banner').style.opacity = '0.15'; // 背景变透明
+            const card = document.getElementById('card-container');
+            card.style.display = 'flex';
+            
+            let i = 0;
+            const el = document.getElementById("typewriter-text");
+            (function type() {
+                if (i < cardText.length) {
+                    el.innerHTML += (cardText[i] === '\n' ? "<br>" : cardText[i]);
+                    i++; setTimeout(type, 100);
+                }
+            })();
+        }
+    </script>
+</body>
+</html>
